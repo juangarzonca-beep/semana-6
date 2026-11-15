@@ -3,7 +3,8 @@
 Proyecto: API de la app tipo Uber (Laravel, JWT y PostgreSQL). Aquí, el registro de vehículos en un repositorio aparte
 Estudiante: Juan José Garzón Cárdenas
 Funcionalidad: HU-03 Registrar un vehículo
-Asistente usado: GitHub Copilot en Visual Studio Code, con el chat y las sugerencias mientras escribía
+Asistentes usados: GitHub Copilot en Visual Studio Code (semana 5) y Claude en el chat (semana 6, revisión)
+Agente de código: no usé ninguno en la semana 6; los cambios los hice en la rama `semana-6-revision`, un commit por hallazgo
 
 ## Entradas
 
@@ -61,13 +62,49 @@ Asistente usado: GitHub Copilot en Visual Studio Code, con el chat y las sugeren
 - **Verificación:** Las pruebas de error usan `expectException(DatosInvalidosException::class)` y comprueban el mensaje exacto de la historia; pasan las dos.
 - **Commit relacionado:** 98ca753 «Registrar vehículo: implementación, las 8 pruebas pasan (en verde)»
 
+### Entrada 7
+
+- **Fecha:** 2026-11-14
+- **Prompt o sugerencia:** «Actúa como revisor de código y de seguridad. Revisa estos archivos con los criterios de corrección y pruebas, diseño y legibilidad, y seguridad (inyección, secretos, contraseñas, control de acceso, dependencias). Devuelve una tabla con archivo y línea, problema y severidad, y separa los problemas seguros de las sospechas.» (Claude, chat)
+- **Decisión:** Aceptada con cambios
+- **Por qué:** Dejé los 4 hallazgos que sí podía reproducir (espacios Unicode en la placa, placa sin longitud máxima, letras parecidas y campos sin validar) y descarté 4 sospechas: path traversal en el autoload, año como texto, condición de carrera e inyección SQL.
+- **Verificación:** Probé cada caso con un script en PHP. Con «TXY123» más un espacio de no separación se guardó otra placa, y una placa de 1 MB se aceptó. En cambio `class_exists('App\..\..\etc\passwd')` dio `false` y el año «2020abc» lanzó `TypeError`. Todo quedó en la tabla 3 de `revision_seguridad.md`.
+- **Commit relacionado:** 6d33361 «Informe revision_seguridad.md…»
+
+### Entrada 8
+
+- **Fecha:** 2026-11-14
+- **Prompt o sugerencia:** Corregir `normalizarPlaca` para que limpie espacios Unicode e invisibles: `preg_replace` con `\p{Z}` y `\p{C}` en modo `/u`, `mb_strtoupper` y error si el texto no es UTF-8 (`preg_replace` devuelve `null`).
+- **Decisión:** Aceptada
+- **Por qué:** Es la regla que el cliente pidió (placa obligatoria y sin repetirse) aplicada a todas las formas de escribir un espacio, y usa el mismo mensaje de error de la historia.
+- **Verificación:** Primero escribí 4 pruebas de abuso y fallaron las 4 (rojo). Después de la corrección pasan las 12 pruebas, y `git diff 94e701d -- tests/RegistroVehiculosTest.php` sale vacío.
+- **Commit relacionado:** fbeaf66 (pruebas en rojo) y f53e449 (corrección)
+
+### Entrada 9
+
+- **Fecha:** 2026-11-14
+- **Prompt o sugerencia:** Escribir docstrings (qué hace, qué recibe, qué devuelve, qué lanza) y tipos de arreglo en PHPDoc para los 3 errores de PHPStan.
+- **Decisión:** Aceptada
+- **Por qué:** PHPStan en nivel máximo pasó de 3 errores a ninguno y las funciones principales quedaron documentadas.
+- **Verificación:** Comparé cada docstring con el código: `registrar` lanza solo `DatosInvalidosException`, `listar` devuelve lista vacía si no hay vehículos, y la placa se guarda limpia y en mayúsculas. Corrí `phpstan` y `phpunit`: sin errores y 12 pruebas pasando.
+- **Commit relacionado:** c69db10
+
+### Entrada 10
+
+- **Fecha:** 2026-11-14
+- **Prompt o sugerencia:** Validar la placa con el formato `^[A-Z]{3}[0-9]{3}$` y una longitud máxima, para cerrar las letras parecidas y la placa gigante.
+- **Decisión:** Rechazada
+- **Por qué:** El cliente no definió el formato (hay motos y otros tipos de placa). Si lo agregaba, el código tendría una regla sin origen en las historias, igual que en la Entrada 2. Quedó como pendiente P-04 para preguntarle a don Hernán.
+- **Verificación:** Revisé HU-03 y el RNF-05: solo piden placa obligatoria y única. Anoté el riesgo en H-06 del informe.
+- **Commit relacionado:** 6d33361 «Informe revision_seguridad.md…»
+
 ## Resumen
 
 | Decisión | Cantidad |
 |---|---|
-| Aceptadas | 2 |
-| Aceptadas con cambios | 2 |
-| Rechazadas | 2 |
+| Aceptadas | 4 |
+| Aceptadas con cambios | 3 |
+| Rechazadas | 3 |
 
 ## Errores que atraparon las pruebas
 
@@ -78,6 +115,13 @@ y `test_la_misma_placa_escrita_en_minusculas_cuenta_como_repetida` (dejaba regis
 ya existía). Lo corregí limpiando la placa con `trim` y `strtoupper` antes de validarla, y comparando con `=== ''`.
 Sin esas pruebas habría quedado un código que parecía funcionar con el ejemplo de la historia, pero dejaba duplicar
 placas con solo cambiar las mayúsculas, que es justo lo que el cliente no quiere.
+
+## Errores que atrapó la revisión de la semana 6
+
+Las 8 pruebas de la semana 5 pasaban, pero la limpieza de la placa solo conocía los espacios normales. Un espacio
+de no separación (U+00A0) o uno de ancho cero (U+200B) al final dejaba registrar «TXY123» dos veces, y una placa de
+solo esos espacios se aceptaba como si no estuviera vacía. Lo encontré probando entradas raras a propósito y lo
+corregí con 4 pruebas de abuso escritas antes del arreglo.
 
 ## Reflexión final
 
