@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<ruleset name="Registro de vehiculos">
+    <description>Estilo PSR-12 y reglas de seguridad (phpcs-security-audit)</description>
+
+    <file>src</file>
+    <file>tests</file>
+
+    <arg name="colors"/>
+    <arg value="sp"/>
+
+    <rule ref="PSR12"/>
+    <rule ref="Security"/>
+
+    <!-- Los nombres de prueba van en snake_case a propósito (leen como una frase). Se excluye solo en tests. -->
+    <rule ref="PSR1.Methods.CamelCapsMethodName">
+        <exclude-pattern>tests/*</exclude-pattern>
+    </rule>
+</ruleset>
