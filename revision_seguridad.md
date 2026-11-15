@@ -7,9 +7,9 @@ Commit revisado: 94e701d (antes de las correcciones)
 
 ## 1. Herramientas y criterios
 
-- **Linter:** PHP_CodeSniffer 3.7.2 con las reglas PSR-12 y `phpcs-security-audit` (reglas de seguridad), y PHPStan 2.3.5 en nivel máximo. Configuración en `phpcs.xml` y `phpstan.neon` (el proyecto es PHP, por eso no hay `pyproject.toml`). Antes: phpcs de seguridad con 2 avisos y PHPStan con 3 errores. Después: 0 y 0.
-- **Auditoría de dependencias:** `composer audit` — **no se pudo ejecutar** (no hay `composer.lock`, y el entorno donde se hizo la revisión no llega a Packagist). Queda como pendiente P-01.
-- **Lista de revisión:** la de la semana 6 (corrección y pruebas, diseño y legibilidad, seguridad). Pruebas: 8 antes, 12 después, todas pasan, y `git diff 94e701d -- tests/RegistroVehiculosTest.php` sale vacío (ninguna prueba se modificó).
+- **Linter:** PHP_CodeSniffer 3.13.6 con las reglas PSR-12 y `phpcs-security-audit` 2.0.1 (reglas de seguridad), y PHPStan 2.3.5 en nivel máximo. Configuración en `phpcs.xml` y `phpstan.neon` (el proyecto es PHP, por eso no hay `pyproject.toml`). Antes: phpcs de seguridad con 2 avisos y PHPStan con 3 errores. Después, con las versiones instaladas por Composer: 0 y 0.
+- **Auditoría de dependencias:** `composer audit` sobre el `composer.lock` — resultado: «No security vulnerability advisories found» (2026-11-14). Dependencias fijadas, por ejemplo phpunit 9.6.39.
+- **Lista de revisión:** la de la semana 6 (corrección y pruebas, diseño y legibilidad, seguridad). Pruebas: 8 antes, 12 después, todas pasan (también con PHPUnit 9.6.39 instalado por Composer), y `git diff 94e701d -- tests/RegistroVehiculosTest.php` sale vacío (ninguna prueba se modificó).
 - **Revisión con IA:** Claude (chat) con el prompt de revisión de la semana (ver sección 3).
 
 ### Puntos de seguridad revisados
@@ -20,7 +20,7 @@ Commit revisado: 94e701d (antes de las correcciones)
 | Secretos (código, historial, .gitignore, .env.example) | Sí | Revisé el historial completo (`git log -p`) y el código buscando password, secret, key y token: sin coincidencias. `.env` ya estaba en `.gitignore`; faltaba `.env.example` (H-05) |
 | Contraseñas (scrypt, bcrypt o argon2 con sal) | No: este repositorio no guarda contraseñas | En la API real serán con bcrypt (ADR-001, RNF-01) |
 | Control de acceso (rol verificado y prueba de abuso) | No, todavía: la clase no tiene usuarios ni capa HTTP; el rol se controla en la API | Pendiente P-02. Sí hay pruebas de abuso de la regla de la placa (H-01) |
-| Dependencias (existen, necesarias, versión fijada, pip-audit) | Sí | `phpunit` existe y es necesaria. Versión sin fijar: no hay `composer.lock` (H-04, P-01) |
+| Dependencias (existen, necesarias, versión fijada, pip-audit) | Sí | `phpunit` existe y es necesaria. Versiones fijadas con `composer.lock` y `composer audit` sin avisos (H-04, P-01) |
 
 ## 2. Tabla de hallazgos
 
@@ -31,7 +31,7 @@ Commit revisado: 94e701d (antes de las correcciones)
 | H-01 | src/RegistroVehiculos.php:41 | `trim` y `strtoupper` no limpian espacios Unicode ni caracteres invisibles: «TXY123» + espacio de no separación entra como placa distinta, y una placa de solo espacios Unicode se acepta como no vacía. Rompe «obligatoria y no repetida» (N-10) | A04 Diseño inseguro / validación de entrada | Media | Limpieza con `preg_replace` Unicode (`\p{Z}`, `\p{C}`), `mb_strtoupper` y rechazo de texto no UTF-8; 4 pruebas de abuso nuevas | fbeaf66 (pruebas en rojo), f53e449 |
 | H-02 | src/RegistroVehiculos.php:11,13,33 | PHPStan: 3 errores por arreglos sin tipo; funciones sin docstring | Mantenibilidad | Baja | PHPDoc con la forma del arreglo (`Vehiculo`) y docstrings con qué hace, recibe, devuelve y lanza; `strict_types` | c69db10 |
 | H-03 | tests/bootstrap.php:3-10 | Autoload propio que arma una ruta de archivo con el nombre de la clase (2 avisos de phpcs-security-audit) y repite lo que ya hace Composer | A01 Control de acceso (path traversal) / duplicación | Baja | Usa `vendor/autoload.php` de Composer | b86371e |
-| H-04 | composer.json:5-9 | Dependencias con rango `^9.6` y sin `composer.lock`; `mbstring` no declarada; sin linter en dependencias de desarrollo | A06 Componentes vulnerables o desactualizados | Media | Declaré `ext-mbstring` y agregué phpcs, phpcs-security-audit y phpstan con scripts. **Falta** generar el `composer.lock` (P-01) | 47a01c2 (parcial) |
+| H-04 | composer.json:5-9 | Dependencias con rango `^9.6` y sin `composer.lock`; `mbstring` no declarada; sin linter en dependencias de desarrollo | A06 Componentes vulnerables o desactualizados | Media | Declaré `ext-mbstring`, agregué phpcs, phpcs-security-audit y phpstan con scripts, y generé el `composer.lock` | 47a01c2 y el commit del `composer.lock` |
 | H-05 | .gitignore, raíz | No existía `.env.example` y `.gitignore` no cubría `.env.*` ni `.phpunit.cache/` | A05 Configuración de seguridad | Baja | `.gitignore` ampliado y `.env.example` sin valores | f879a52 |
 | H-06 | src/RegistroVehiculos.php:13-31 | La placa no tiene longitud máxima (acepté una de 1 MB) ni formato: «ТХУ123» con letras cirílicas o en ancho completo cuenta como otra placa | A04 Diseño inseguro / validación de entrada | Media | **Sin corregir**: el cliente no definió el formato (P-04) | pendiente |
 | H-07 | src/RegistroVehiculos.php:13 | Marca, modelo y año no se validan (acepta año -5 y `<script>` en la marca) | A03 Inyección (si luego se muestra sin escapar) | Baja | **Sin corregir**: decisión de la semana 5, el cliente no dio reglas (P-04) | pendiente |
@@ -60,13 +60,13 @@ Commit revisado: 94e701d (antes de las correcciones)
 | Condición de carrera al revisar «placa repetida» y luego guardar (sospecha) | Falso positivo hoy | Es un arreglo en memoria y una sola ejecución. Será real con PostgreSQL: ahí manda la restricción UNIQUE (P-03) |
 | Inyección SQL (sospecha) | Falso positivo | No hay base de datos ni consultas |
 
-**Lo que la IA no encontró:** la IA no pudo ejecutar `composer install` ni `composer audit` (sin acceso a Packagist), así que no vio las versiones reales de las dependencias ni sus vulnerabilidades, y tampoco puede generar el `composer.lock`. Eso lo tengo que correr yo en mi computador (P-01).
+**Lo que la IA no encontró:** al correr `composer lint` en mi computador, Composer avisó «A script named audit would override a Composer command and has been skipped». La IA había agregado un script `audit` en `composer.json` que choca con el comando propio de Composer, y no lo vio porque no pudo ejecutar Composer (sin acceso a Packagist). Lo eliminé: `composer audit` ya funciona sin script. Además, la IA no pudo ver las versiones reales de las dependencias ni sus vulnerabilidades; eso lo comprobé yo con `composer install` y `composer audit`.
 
 ## 4. Pendientes
 
 | Pendiente | Por qué no se corrigió todavía | Plan |
 |---|---|---|
-| P-01. `composer.lock` y `composer audit` | El entorno de la revisión no llega a Packagist | `composer update`, subir `composer.lock` y correr `composer audit`; corregir lo que salga |
+| P-01. `composer.lock` y `composer audit` | Hecho el 2026-11-14: `composer.lock` subido y `composer audit` sin avisos | Repetir `composer audit` antes de cada entrega |
 | P-02. Control de acceso por rol (HU-06, RNF-03) | Esta clase no tiene usuarios ni HTTP | En la API Laravel: middleware de rol y prueba de abuso (un pasajero recibe 403 al registrar un vehículo) |
 | P-03. Inyección y unicidad con PostgreSQL | Todavía no hay base de datos | Consultas con parámetros (Eloquent o `?`), columna `placa` con UNIQUE y prueba de inyección |
 | P-04. Formato y longitud de la placa, y reglas de marca, modelo y año (H-06, H-07) | El cliente no las ha definido | Preguntar a don Hernán; luego validar con una expresión como `^[A-Z0-9]{5,7}$` (422) y agregar pruebas |

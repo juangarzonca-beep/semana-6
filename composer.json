@@ -32,7 +32,6 @@
     "scripts": {
         "test": "phpunit",
         "lint": "phpcs",
-        "stan": "phpstan analyse --no-progress",
-        "audit": "composer audit"
+        "stan": "phpstan analyse --no-progress"
     }
 }
