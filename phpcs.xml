@@ -15,4 +15,9 @@
     <rule ref="PSR1.Methods.CamelCapsMethodName">
         <exclude-pattern>tests/*</exclude-pattern>
     </rule>
+
+    <!-- Las pruebas de la semana 5 no llevan namespace y la regla de la tarea es no modificarlas. PHPUnit las carga por archivo. -->
+    <rule ref="PSR1.Classes.ClassDeclaration.MissingNamespace">
+        <exclude-pattern>tests/*</exclude-pattern>
+    </rule>
 </ruleset>
