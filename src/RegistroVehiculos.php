@@ -35,10 +35,19 @@ class RegistroVehiculos
         return array_values($this->vehiculos);
     }
 
-    // Quita espacios a los lados y pasa a mayúsculas, así «txy123» y «TXY123» son la misma placa
+    // Quita espacios a los lados (incluidos los de Unicode, como el de no separación) y pasa a
+    // mayúsculas, así «txy123» y «TXY123» son la misma placa
     private function normalizarPlaca(string $placa): string
     {
-        return strtoupper(trim($placa));
+        // \p{Z}: espacios Unicode (U+00A0, etc.). \p{C}: caracteres invisibles o de control (U+200B, BOM)
+        $limpia = preg_replace('/^[\s\p{Z}\p{C}]+|[\s\p{Z}\p{C}]+$/u', '', $placa);
+
+        // preg_replace devuelve null cuando el texto no es UTF-8 válido
+        if ($limpia === null) {
+            throw new DatosInvalidosException(self::MENSAJE_PLACA_INVALIDA);
+        }
+
+        return mb_strtoupper($limpia, 'UTF-8');
     }
 
     // La placa sirve si no está vacía y todavía no existe
